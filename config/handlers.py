@@ -1,7 +1,7 @@
 from aiogram import Dispatcher, types
 from aiogram.filters import Command
 
-from config.funding_fetcher import get_all_funding
+from funding_fetcher import get_all_funding
 from utils import calc_max_spread, normalize_funding_data
 
 
