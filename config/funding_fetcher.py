@@ -1,5 +1,7 @@
 import httpx
 import asyncio
+import time
+from datetime import datetime, timedelta
 
 
 async def fetch_mexc(symbol: str):
@@ -344,3 +346,263 @@ async def get_all_funding(symbol: str):
             funding_data.append(res)
 
     return funding_data
+
+
+async def fetch_binance_history(symbol: str, days: int = 7, limit: int = 500):
+    """
+    Получает историю ставок финансирования Binance за последние `days` дней.
+    """
+    end = int(datetime.utcnow().timestamp() * 1000)
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp() * 1000)
+    url = "https://fapi.binance.com/fapi/v1/fundingRate"
+    params = {
+        "symbol": symbol,
+        "startTime": start,
+        "endTime": end,
+        "limit": limit
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    history = []
+    for item in resp_json:
+        history.append({
+            "exchange": "BINANCE",
+            "symbol": symbol,
+            "funding_rate": float(item.get("fundingRate", 0)),
+            "funding_time": int(item.get("fundingTime", 0))
+        })
+    return history
+
+
+async def fetch_bybit_history(symbol: str, days: int = 100):
+    end = int(time.time()) * 1000
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp()) * 1000
+    url = f"https://api.bybit.com/v5/market/funding/history?symbol={symbol}&startTime={start}&endTime={end}&category=linear"
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url)
+        resp_json = r.json()
+    
+    history = []
+    
+    for item in resp_json.get("result", {}).get("list", []):
+        history.append({
+            "exchange": "BYBIT",
+            "symbol": symbol,
+            "funding_rate": float(item["fundingRate"]),
+            "funding_time": int(item["fundingRateTimestamp"])
+        })
+    
+    return history
+
+
+async def fetch_kucoin_history(symbol: str, days: int):
+    """
+    История funding rate KuCoin (публичная история), за интервал времени [start, end] (unix seconds).
+    """
+    end = int(time.time()) * 1000
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp()) * 1000
+    url = "https://api-futures.kucoin.com/api/v1/contract/funding-rates"
+    if symbol == "BTCUSDT":
+        symbol = "XBTUSDTM"
+    elif symbol:
+        symbol = f"{symbol}M"
+
+    params = {
+        "symbol": f"{symbol}",
+        "from": start,
+        "to": end,
+    }
+    print(f"SYMBOLLLL       {symbol}M")
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+        print(f"kucoin response____    {resp_json}")
+    history = []
+    data_list = resp_json.get("data", [])
+    for item in data_list:
+        history.append({
+            "exchange": "KUCOIN",
+            "symbol": f"{symbol}",
+            "funding_rate": float(item.get("value", item.get("fundingRate", 0))),
+            "funding_time": int(item.get("timePoint", item.get("time", item.get("fundingTime", 0))))
+        })
+    return history
+
+
+async def fetch_okx_history(instId: str, days: int = 7, limit: int = 100):
+    """
+    История funding rate OKX за последние `days` дней.
+    instId формат: e.g. "BTC-USDT-SWAP"
+    """
+    end = int(datetime.utcnow().timestamp() * 1000)
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp() * 1000)
+    url = "https://www.okx.com/api/v5/public/funding-rate-history"
+    if "USDT" in instId:
+        instId.replace("USDT", "-USDT-SWAP")
+    params = {
+        "instId": instId,
+        "limit": limit,
+        "before": None,
+        "after": None,
+        "startTime": start,
+        "endTime": end
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    print(f"answer    {resp_json}")
+    history = []
+    for item in resp_json.get("data", []):
+        history.append({
+            "exchange": "OKX",
+            "symbol": instId,
+            "funding_rate": float(item.get("fundingRate", 0)),
+            "funding_time": int(item.get("fundingTime", 0))
+        })
+    return history
+
+
+async def fetch_mexc_history(symbol: str, days: int = 100):
+    url = f"https://api.bybit.com/v5/market/funding/history"
+    cutoff = int((time.time() - 3 * 24 * 60 * 60) * 1000)
+    params = {
+        "symbol": symbol,
+        "page_num": '',
+        "page_size": '',
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    print(f"answerMEXC    {resp_json}")
+
+    all_data = []
+    for item in resp_json["data"]["resultList"]:
+        if item["settleTime"] >= cutoff:
+            all_data.append(item)
+
+    history = []
+    
+    for item in all_data:
+        history.append({
+            "exchange": "MEXC",
+            "symbol": symbol,
+            "funding_rate": float(item["fundingRate"]),
+            "funding_time": int(item["settleTime"])
+        })
+
+    return history
+
+
+async def fetch_blofin_history(symbol: str, days: int = 7, limit: int = 100):
+    """
+    История funding rate Blofin за последние `days` дней.
+    instId формат: e.g. "BTC-USDT-SWAP"
+    """
+    end = int(datetime.utcnow().timestamp() * 1000)
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp() * 1000)
+    url = "https://openapi.blofin.com/api/v1/market/funding-rate-history"
+
+    params = {
+        "instId": symbol,
+        "limit": limit,
+        "before": start,
+        "after": end,
+        "startTime": None,
+        "endTime": None
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    print(f"answer BLOFIN    {resp_json}")
+
+    history = []
+    for item in resp_json.get("data", []):
+        history.append({
+            "exchange": "BLOFIN",
+            "symbol": symbol,
+            "funding_rate": float(item.get("fundingRate", 0)),
+            "funding_time": int(item.get("fundingTime", 0))
+        })
+    return history
+
+
+async def fetch_htx_history(symbol: str, days: int = 100):
+    url = f"https://api.bybit.com/v5/market/funding/history"
+    cutoff = int((time.time() - days * 24 * 60 * 60) * 1000)
+    params = {
+        "symbol": symbol,
+        "page_num": '',
+        "page_size": '',
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    print(f"answer    {resp_json}")
+
+    all_data = []
+    for item in resp_json["data"]["resultList"]:
+        if item["settleTime"] >= cutoff:
+            all_data.append(item)
+
+    history = []
+
+    for item in all_data:
+        history.append({
+            "exchange": "HTX",
+            "symbol": symbol,
+            "funding_rate": float(item["fundingRate"]),
+            "funding_time": int(item["settleTime"])
+        })
+
+    return history
+
+
+async def fetch_Gate_history(symbol: str, days: int = 7, limit: int = 100):
+    """
+    История funding rate Gate за последние `days` дней.
+    instId формат: e.g. "BTC-USDT-SWAP"
+    """
+    end = int(datetime.utcnow().timestamp() * 1000)
+    start = int((datetime.utcnow() - timedelta(days=days)).timestamp() * 1000)
+    url = f"https://api.gateio.ws/api/v4/futures/{symbol}/funding_rate"
+
+    params = {
+        "settle": symbol,
+        "contract": symbol,
+        "from": start,
+        "to": end,
+    }
+    async with httpx.AsyncClient(verify=False) as client:
+        r = await client.get(url, params=params)
+        resp_json = r.json()
+    print(f"answer    {resp_json}")
+        
+    history = []
+    for item in resp_json.get("data", []):
+        history.append({
+            "exchange": "GATE",
+            "symbol": symbol,
+            "funding_rate": float(item.get("r", 0)),
+            "funding_time": int(item.get("t", 0))
+        })
+    return history
+
+
+async def get_history_all(symbol: str, days: int = 7):
+
+    tasks = [
+        fetch_binance_history(symbol, days),
+        fetch_bybit_history(symbol, days),
+        # fetch_okx_history(symbol, days),
+        # fetch_kucoin_history(symbol, days),
+        # fetch_htx_history(symbol, days),
+        # fetch_Gate_history(symbol, days),
+        # fetch_blofin_history(symbol, days)
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    history = []
+    for res in results:
+        if isinstance(res, list):
+            history.extend(res)
+    return history

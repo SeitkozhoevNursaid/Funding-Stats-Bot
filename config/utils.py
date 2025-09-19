@@ -1,5 +1,9 @@
+import io
 import itertools
 from datetime import datetime
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def calc_spread(rate1, rate2):
