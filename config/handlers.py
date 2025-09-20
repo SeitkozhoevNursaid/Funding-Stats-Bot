@@ -72,16 +72,16 @@ async def funding_cmd(message: types.Message):
 
 async def funding_spread_chart_cmd(message: types.Message):
     """
-    /funding_spread_chart <symbol> <exchange> <days>
-    Пример: /funding_spread_chart BTCUSDT OKX 7
+    /funding_spread_chart <exchange> <days> <symbol>  
+    Пример: /funding_spread_chart OKX 7 BTCUSDT
     """
     args = message.text.split()
     if len(args) < 4:
-        return await message.answer("⚠️ Пример: /funding_spread_chart BTCUSDT OKX 7")
+        return await message.answer("⚠️ Пример: /funding_spread_chart OKX 7 BTCUSDT")
 
-    symbol = args[1].upper()
-    exchange = args[2].upper()
-    days = int(args[3])
+    exchange = args[1].upper()
+    days = int(args[2])
+    symbol = args[3].upper()
 
     history = await get_history_all(symbol, days)
     if not history:
