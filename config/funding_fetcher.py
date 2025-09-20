@@ -382,9 +382,9 @@ async def fetch_bybit_history(symbol: str, days: int = 100):
     async with httpx.AsyncClient(verify=False) as client:
         r = await client.get(url)
         resp_json = r.json()
-    
+
     history = []
-    
+
     for item in resp_json.get("result", {}).get("list", []):
         history.append({
             "exchange": "BYBIT",
@@ -392,7 +392,7 @@ async def fetch_bybit_history(symbol: str, days: int = 100):
             "funding_rate": float(item["fundingRate"]),
             "funding_time": int(item["fundingRateTimestamp"])
         })
-    
+
     return history
 
 
@@ -471,7 +471,7 @@ async def fetch_okx_history(instId: str, days: int = 7):
 
 
 async def fetch_mexc_history(symbol: str, days: int = 100):
-    url = f"https://contract.mexc.com/api/v1/contract/funding_rate/history"
+    url = "https://contract.mexc.com/api/v1/contract/funding_rate/history"
     cutoff = int((time.time() - days * 24 * 60 * 60) * 1000)
 
     if 'USDT' in symbol:
@@ -490,7 +490,7 @@ async def fetch_mexc_history(symbol: str, days: int = 100):
     filtered = [item for item in resp_json['data']['resultList'] if int(item["settleTime"]) >= cutoff]
     all_data.extend(filtered)
     history = []
-    
+
     for item in all_data:
         history.append({
             "exchange": "MEXC",
@@ -540,7 +540,7 @@ async def fetch_bitget_history(symbol: str, days: int = 100):
 
 
 async def fetch_bitmart_history(symbol: str, days: int = 100):
-    url = f"https://api-cloud-v2.bitmart.com/contract/public/funding-rate-history"
+    url = "https://api-cloud-v2.bitmart.com/contract/public/funding-rate-history"
     cutoff = int((time.time() - days * 24 * 60 * 60) * 1000)
 
     params = {
@@ -554,7 +554,7 @@ async def fetch_bitmart_history(symbol: str, days: int = 100):
     filtered = [item for item in resp_json['data']['list'] if int(item["funding_time"]) >= cutoff]
     all_data.extend(filtered)
     history = []
-    
+
     for item in all_data:
         history.append({
             "exchange": "BITMART",
@@ -567,7 +567,7 @@ async def fetch_bitmart_history(symbol: str, days: int = 100):
 
 
 async def fetch_weex_history(symbol: str, days: int = 100):
-    url = f"https://contract.mexc.com/api/v1/contract/funding_rate/history"
+    url = "https://contract.mexc.com/api/v1/contract/funding_rate/history"
     cutoff = int((time.time() - days * 24 * 60 * 60) * 1000)
 
     if 'USDT' in symbol:
@@ -586,7 +586,7 @@ async def fetch_weex_history(symbol: str, days: int = 100):
     filtered = [item for item in resp_json['data']['resultList'] if int(item["settleTime"]) >= cutoff]
     all_data.extend(filtered)
     history = []
-    
+
     for item in all_data:
         history.append({
             "exchange": "WEEX",
@@ -650,7 +650,7 @@ async def fetch_coinex_history(symbol: str, days: int = 7):
     async with httpx.AsyncClient(verify=False) as client:
         r = await client.get(url, params=params)
         resp_json = r.json()
-    
+
     history = []
     for item in resp_json.get("data", []):
         history.append({
@@ -683,7 +683,7 @@ async def fetch_bingx_history(symbol: str, days: int = 7):
     async with httpx.AsyncClient(verify=False) as client:
         r = await client.get(url, params=params)
         resp_json = r.json()
-    
+
     history = []
     for item in resp_json.get("data", []):
         history.append({
@@ -697,7 +697,7 @@ async def fetch_bingx_history(symbol: str, days: int = 7):
 
 
 async def fetch_htx_history(symbol: str, days: int = 100):
-    url = f"https://api.hbdm.com/linear-swap-api/v1/swap_historical_funding_rate"
+    url = "https://api.hbdm.com/linear-swap-api/v1/swap_historical_funding_rate"
     cutoff = int((time.time() - days * 24 * 60 * 60) * 1000)
 
     if 'USDT' in symbol:

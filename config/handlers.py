@@ -54,14 +54,12 @@ async def funding_cmd(message: types.Message):
     symbol = args[1].upper()
     data = await get_all_funding(symbol)
     data = normalize_funding_data(data)
-    print(f"our_dataaaa    {data}")
 
     if not data:
         return await message.answer("❌ Не удалось получить данные")
 
     text = f"📊 Ставки финансирования по {symbol}:\n\n"
     for row in data:
-        print(f'roww++++          {row}')
         text += f"{row['exchange']}: {row['funding_rate']}% (время {row['next_funding_time']})\n"
 
     spread, pair = calc_max_spread(data)
@@ -72,7 +70,7 @@ async def funding_cmd(message: types.Message):
 
 async def funding_spread_chart_cmd(message: types.Message):
     """
-    /funding_spread_chart <exchange> <days> <symbol>  
+    /funding_spread_chart <exchange> <days> <symbol>
     Пример: /funding_spread_chart OKX 7 BTCUSDT
     """
     args = message.text.split()
@@ -145,7 +143,6 @@ async def top_tokens_chart_cmd(message: types.Message):
 
         # фильтруем по бирже
         rates = [h for h in history if h["exchange"] == exchange]
-        print(f"aaaaaaaaaaaaa{rates}")
         rates.sort(key=lambda x: x["funding_time"])
         if not rates:
             continue
