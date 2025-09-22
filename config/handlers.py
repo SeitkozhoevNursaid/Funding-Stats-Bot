@@ -25,10 +25,10 @@ async def start_cmd(message: types.Message):
         "   — Текущие ставки финансирования для символа по всем поддерживаемым биржам\n"
         "   — Выводит: биржа, funding_rate (в % с 6 знаками), время исполнения в формате HH:MM:SS и максимальный спред между биржами.\n"
         "   Пример: /funding BTCUSDT\n\n"
-        "2) /funding_spread_chart <symbol> <exchange> <days>\n"
+        "2) /funding_spread_chart <exchange> <days> <symbol>\n"
         "   — Построить график кумулятивной суммы (cumulative) funding rate по одному символу на выбранной бирже за последние <days> дней.\n"
         "   — Также таблица/список с исходными точками времени и соответствующими funding_rate (без суммирования).\n"
-        "   Формат: /funding_spread_chart BTCUSDT BYBIT 7\n"
+        "   Формат: /funding_spread_chart BYBIT 7 BTCUSDT\n"
         "   Примечание: <exchange> — код биржи (например, BINANCE, BYBIT).\n\n"
         "3) /top_tokens_chart <exchange> <days> <symbol1,symbol2,...>\n"
         "   — Для заданного списка токенов строит кумулятивные графики funding rate (каждый токен) и сортирует их по итоговой кумулятивной разнице.\n"
@@ -48,8 +48,10 @@ async def funding_cmd(message: types.Message):
     Хэндлер команды /funding
     """
     args = message.text.split()
-    if len(args) < 2:
+    if len(args) < 2 or len(args) > 2:
         return await message.answer("⚠️ Укажи символ, например: /funding BTCUSDT")
+
+    await message.answer('Идет обработка запроса, это займет некоторое время...')
 
     symbol = args[1].upper()
     data = await get_all_funding(symbol)
@@ -60,10 +62,10 @@ async def funding_cmd(message: types.Message):
 
     text = f"📊 Ставки финансирования по {symbol}:\n\n"
     for row in data:
-        text += f"{row['exchange']}: {row['funding_rate']}% (время {row['next_funding_time']})\n"
+        text += f"{row['exchange']}: {(row['funding_rate'] * 100):.2f}% (время {row['next_funding_time']})\n"
 
     spread, pair = calc_max_spread(data)
-    text += f"\n🔥 Максимальный спред: {spread:.5f}% ({pair[0]} ↔ {pair[1]})"
+    text += f"\n🔥 Максимальный спред: {(spread * 100):.3f}% ({pair[0]} ↔ {pair[1]})"
 
     await message.answer(text)
 
@@ -74,8 +76,10 @@ async def funding_spread_chart_cmd(message: types.Message):
     Пример: /funding_spread_chart OKX 7 BTCUSDT
     """
     args = message.text.split()
-    if len(args) < 4:
+    if len(args) < 4 or len(args) > 4:
         return await message.answer("⚠️ Пример: /funding_spread_chart OKX 7 BTCUSDT")
+    
+    await message.answer('Идет обработка запроса, это займет некоторое время...')
 
     exchange = args[1].upper()
     days = int(args[2])
@@ -89,14 +93,20 @@ async def funding_spread_chart_cmd(message: types.Message):
     rates.sort(key=lambda x: x["funding_time"])
 
     times = [datetime.utcfromtimestamp(h["funding_time"]/1000) for h in rates]
-    funding_rates = [h["funding_rate"]*100 for h in rates]  # в процентах
+    funding_rates = [(h["funding_rate"] * 100) * 100 for h in rates]  # в процентах
     cum_rates = np.cumsum(funding_rates)
+
+    total = round(np.sum(funding_rates), 2)
+    mean = round(np.mean(funding_rates), 2)
+    max_rate = round(np.max(funding_rates), 2)
+    min_rate = round(np.min(funding_rates), 2)
 
     plt.figure(figsize=(10, 5))
     plt.plot(times, cum_rates, label=f"Cumulative Funding Rate {exchange}")
-    for t, y in zip(times, cum_rates):
-        plt.text(t, y, f"{y:.6f}", fontsize=8, color="red")
-    plt.title(f"Cumulative Funding Rate {symbol} ({exchange})")
+    plt.title(
+        f"Cumulative Funding Rate {symbol} ({exchange})\n"
+        f"Total: {total}% | Mean(average): {mean}% | Max: {max_rate}% | Min: {min_rate}%"
+    )
     plt.xlabel("Time")
     plt.ylabel("Cumulative %")
     plt.legend()
@@ -116,19 +126,22 @@ async def funding_spread_chart_cmd(message: types.Message):
 
 async def top_tokens_chart_cmd(message: types.Message):
     """
-    /top_cum_chart <exchange> <days> <tokens>
+    /top_tokens_chart  <exchange> <days> <tokens>
     Пример:
-    /top_cum_chart OKX 3 BTCUSDT,ETHUSDT,SOLUSDT
+    /top_tokens_chart  OKX 3 BTCUSDT,ETHUSDT,SOLUSDT
     """
     args = message.text.split()
     if len(args) < 4:
         return await message.answer(
-            "⚠️ Пример: /top_cum_chart OKX 3 BTCUSDT,ETHUSDT,SOLUSDT"
+            "⚠️ Пример: /top_tokens_chart  OKX 3 BTCUSDT,ETHUSDT,SOLUSDT"
         )
+
+    await message.answer('Идет обработка запроса, это займет некоторое время...')
 
     exchange = args[1].upper()
     days = int(args[2])
-    tokens = [t.strip().upper() for t in args[3].split(",") if t.strip()]
+    raw_tokens = args[3].replace(', ', ',')
+    tokens = [t.strip().upper() for t in raw_tokens.split(",") if t.strip()]
 
     if not tokens:
         return await message.answer("❌ Укажите хотя бы один токен")
@@ -142,17 +155,21 @@ async def top_tokens_chart_cmd(message: types.Message):
             continue
 
         # фильтруем по бирже
-        rates = [h for h in history if h["exchange"] == exchange]
+        rates = [h for h in history if h["exchange"].upper() == exchange.upper()]
         rates.sort(key=lambda x: x["funding_time"])
         if not rates:
             continue
 
         times = [datetime.utcfromtimestamp(h["funding_time"]/1000) for h in rates]
-        funding_rates = [h["funding_rate"]*100 for h in rates]
+        funding_rates = [(h["funding_rate"] * 100) * 100 for h in rates]
         cum = np.cumsum(funding_rates)
 
-        total = cum[-1] if cum.size else 0
-        results.append((symbol, total, times, cum))
+        total = round(cum[-1], 2)
+        mean = round(np.mean(funding_rates), 2)
+        max_rate = round(np.max(funding_rates), 2)
+        min_rate = round(np.min(funding_rates), 2)
+
+        results.append((symbol, total, mean, max_rate, min_rate, times, cum))
 
     if not results:
         return await message.answer("❌ Нет данных по заданным токенам")
@@ -160,10 +177,12 @@ async def top_tokens_chart_cmd(message: types.Message):
     results.sort(key=lambda x: abs(x[1]), reverse=True)
 
     plt.figure(figsize=(12, 6))
-    for symbol, total, times, cum in results:
-        plt.plot(times, cum, label=f"{symbol} ({total:.4f})")
-        for t, y in zip(times, cum):
-            plt.text(t, y, f"{y:.6f}", fontsize=8, color="red")
+    for symbol, total, mean, max_rate, min_rate, times, cum in results:
+        label = (
+            f"{symbol} | Total:{total}% | Mean:{mean}% "
+            f"| Max:{max_rate}% | Min:{min_rate}%"
+        )
+        plt.plot(times, cum, label=label)
 
     plt.title(f"TOP cumulative funding ({exchange}) - {days}d")
     plt.xlabel("Time")
